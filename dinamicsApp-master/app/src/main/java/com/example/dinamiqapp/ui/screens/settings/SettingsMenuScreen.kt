@@ -14,15 +14,14 @@ import androidx.compose.ui.unit.sp
 fun SettingsMenuScreen(
     onNavigateToDynamicSettings: () -> Unit,
     onNavigateToHearingCalc: () -> Unit,
+    onNavigateToAppSettings: () -> Unit,
     onBack: () -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Configuració") },
-                navigationIcon = {
-                    TextButton(onClick = onBack) { Text("←") }
-                }
+                navigationIcon = { TextButton(onClick = onBack) { Text("←") } }
             )
         }
     ) { padding ->
@@ -36,9 +35,7 @@ fun SettingsMenuScreen(
         ) {
             Button(
                 onClick = onNavigateToDynamicSettings,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
+                modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
                 Text("Ajustar valors dinàmiques", fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
@@ -47,11 +44,18 @@ fun SettingsMenuScreen(
 
             OutlinedButton(
                 onClick = onNavigateToHearingCalc,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
+                modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
                 Text("Fer càlcul per audició", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedButton(
+                onClick = onNavigateToAppSettings,
+                modifier = Modifier.fillMaxWidth().height(56.dp)
+            ) {
+                Text("Paràmetres de l'app", fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
         }
     }

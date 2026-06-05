@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -44,21 +45,21 @@ object DefaultProfiles {
     val HOME = DynamicsProfile(
         name = "Casa",
         ranges = mapOf(
-            DynamicLevel.PP to DynamicRange(-65f, -55f),
-            DynamicLevel.P  to DynamicRange(-55f, -48f),
-            DynamicLevel.MF to DynamicRange(-48f, -40f),
-            DynamicLevel.F  to DynamicRange(-40f, -32f),
-            DynamicLevel.FF to DynamicRange(-32f, -18f),
+            DynamicLevel.PP to DynamicRange(ScaleConverter.scaleToDb(38f), ScaleConverter.scaleToDb(70f)),
+            DynamicLevel.P  to DynamicRange(ScaleConverter.scaleToDb(71f), ScaleConverter.scaleToDb(74f)),
+            DynamicLevel.MF to DynamicRange(ScaleConverter.scaleToDb(75f), ScaleConverter.scaleToDb(78f)),
+            DynamicLevel.F  to DynamicRange(ScaleConverter.scaleToDb(79f), ScaleConverter.scaleToDb(81f)),
+            DynamicLevel.FF to DynamicRange(ScaleConverter.scaleToDb(82f), ScaleConverter.scaleToDb(100f)),
         )
     )
     val CONCERT = DynamicsProfile(
         name = "Concert",
         ranges = mapOf(
-            DynamicLevel.PP to DynamicRange(-80f, -70f),
-            DynamicLevel.P  to DynamicRange(-70f, -62f),
-            DynamicLevel.MF to DynamicRange(-62f, -54f),
-            DynamicLevel.F  to DynamicRange(-54f, -44f),
-            DynamicLevel.FF to DynamicRange(-44f, -25f),
+            DynamicLevel.PP to DynamicRange(ScaleConverter.scaleToDb(40f), ScaleConverter.scaleToDb(72f)),
+            DynamicLevel.P  to DynamicRange(ScaleConverter.scaleToDb(73f), ScaleConverter.scaleToDb(76f)),
+            DynamicLevel.MF to DynamicRange(ScaleConverter.scaleToDb(77f), ScaleConverter.scaleToDb(79f)),
+            DynamicLevel.F  to DynamicRange(ScaleConverter.scaleToDb(80f), ScaleConverter.scaleToDb(82f)),
+            DynamicLevel.FF to DynamicRange(ScaleConverter.scaleToDb(83f), ScaleConverter.scaleToDb(100f)),
         )
     )
 }
@@ -70,10 +71,15 @@ object DefaultProfiles {
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "dynamics_settings")
 
 class SettingsRepository(private val context: Context) {
+    val appMinDb: Flow<Float> = context.dataStore.data.map { it[APP_MIN_DB] ?: -70f }
+    val appMaxDb: Flow<Float> = context.dataStore.data.map { it[APP_MAX_DB] ?: 0f }
+    val appRefreshMs: Flow<Int> = context.dataStore.data.map { it[APP_REFRESH_MS] ?: 200 }
 
     companion object {
         private val ACTIVE_PROFILE = stringPreferencesKey("active_profile")
-        // Keys for each dynamic min/max per profile
+        private val APP_MIN_DB = floatPreferencesKey("app_min_db")
+        private val APP_MAX_DB = floatPreferencesKey("app_max_db")
+        private val APP_REFRESH_MS = intPreferencesKey("app_refresh_ms")
         private fun rangeKey(profile: String, level: DynamicLevel, isMin: Boolean) =
             floatPreferencesKey("${profile}_${level.name}_${if (isMin) "min" else "max"}")
     }
@@ -97,11 +103,28 @@ class SettingsRepository(private val context: Context) {
     suspend fun saveActiveProfile(name: String) {
         context.dataStore.edit { it[ACTIVE_PROFILE] = name }
     }
+    suspend fun setAppMinDb(value: Float) {
+        context.dataStore.edit { it[APP_MIN_DB] = value }
+    }
+    suspend fun setAppMaxDb(value: Float) {
+        context.dataStore.edit { it[APP_MAX_DB] = value }
+    }
+    suspend fun setAppRefreshMs(value: Int) {
+        context.dataStore.edit { it[APP_REFRESH_MS] = value }
+    }
 
     suspend fun saveRange(profileName: String, level: DynamicLevel, range: DynamicRange) {
         context.dataStore.edit { prefs ->
             prefs[rangeKey(profileName, level, true)]  = range.min
             prefs[rangeKey(profileName, level, false)] = range.max
+        }
+    }
+
+    // Aquesta és la funció nova, ben col·locada dins la classe
+    suspend fun resetToDefaults(profileName: String) {
+        val defaults = if (profileName == "Concert") DefaultProfiles.CONCERT else DefaultProfiles.HOME
+        defaults.ranges.forEach { (level, range) ->
+            saveRange(profileName, level, range)
         }
     }
 }

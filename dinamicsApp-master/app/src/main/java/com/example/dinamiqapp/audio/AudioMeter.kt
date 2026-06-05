@@ -25,24 +25,25 @@ object AudioMeter {
     // ~100ms window at 44100 Hz
     private const val READ_SAMPLES = 4_096
     @androidx.annotation.RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
-
-    fun dbFlow(): Flow<Float> = flow  {
+    fun dbFlow(windowMs: Long = 200): Flow<Float> = flow {
+        val sampleRate = SAMPLE_RATE
+        val samplesPerWindow = (sampleRate * windowMs / 1000).toInt().coerceAtLeast(1024)
         val bufSize = maxOf(
-            AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING),
-            READ_SAMPLES * 2
+            AudioRecord.getMinBufferSize(sampleRate, CHANNEL_IN, ENCODING),
+            samplesPerWindow * 2
         )
         val recorder = AudioRecord(
             MediaRecorder.AudioSource.MIC,
-            SAMPLE_RATE,
+            sampleRate,
             CHANNEL_IN,
             ENCODING,
             bufSize
         )
         recorder.startRecording()
         try {
-            val buffer = ShortArray(READ_SAMPLES)
+            val buffer = ShortArray(samplesPerWindow)
             while (currentCoroutineContext().isActive) {
-                val read = recorder.read(buffer, 0, READ_SAMPLES)
+                val read = recorder.read(buffer, 0, samplesPerWindow)
                 if (read > 0) {
                     var sum = 0.0
                     for (i in 0 until read) {
@@ -50,7 +51,6 @@ object AudioMeter {
                         sum += s * s
                     }
                     val rms = sqrt(sum / read)
-                    // Normalise against 16-bit max (32768), convert to dBFS
                     val db = if (rms > 0) 20.0 * log10(rms / 32768.0) else -90.0
                     emit(db.toFloat().coerceIn(-90f, 0f))
                 }

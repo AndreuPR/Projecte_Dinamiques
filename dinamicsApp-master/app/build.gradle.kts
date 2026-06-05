@@ -19,6 +19,14 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // El nom que tindrà l'app oficial instal·lada
+            manifestPlaceholders["appName"] = "DinamiqApp"
+        }
+        debug {
+            // Això farà que l'ID sigui "com.dynamicsapp.dev"
+            applicationIdSuffix = ".dev"
+            // El nom que tindrà aquesta versió de proves al mòbil
+            manifestPlaceholders["appName"] = "DinamiqApp DEV"
         }
     }
     compileOptions {

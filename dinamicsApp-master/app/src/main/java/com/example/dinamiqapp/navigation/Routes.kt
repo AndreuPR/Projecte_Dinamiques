@@ -7,4 +7,5 @@ sealed class Screen(val route: String) {
     object SettingsMenu : Screen("settings_menu")
     object Settings : Screen("settings")   // sliders
     object HearingCalc : Screen("hearing_calc")
+    object AppSettings : Screen("app_settings")
 }

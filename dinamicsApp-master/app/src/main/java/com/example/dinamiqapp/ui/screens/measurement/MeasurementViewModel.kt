@@ -22,13 +22,12 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     val precision: StateFlow<Float> = _precision
     @androidx.annotation.RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
     fun startMeasuring() {
-        viewModelScope.launch  {
-            // Obtenim el perfil actiu i els seus rangs en dBFS
+        viewModelScope.launch {
+            val refreshMs = repository.appRefreshMs.first().toLong()
             val profileName = repository.activeProfileName.first()
             val rangesFlow = repository.profileRanges(profileName)
 
-            // Combinem el flux d'àudio amb els rangs
-            AudioMeter.dbFlow().combine(rangesFlow) { db, ranges ->
+            AudioMeter.dbFlow(refreshMs).combine(rangesFlow) { db, ranges ->
                 val intensity = ScaleConverter.dbToScale(db).roundToInt().coerceIn(0, 100)
                 val reading = classifyDb(db, ranges)
                 Triple(intensity, reading.level, reading.precision)

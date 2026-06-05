@@ -8,11 +8,10 @@ import com.example.dinamiqapp.data.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
-// Estat de cada botó dinàmic
 sealed class RecordState {
     object Idle : RecordState()
     object Recording : RecordState()
-    data class Recorded(val value: Float) : RecordState()  // valor 0-100
+    data class Recorded(val value: Float) : RecordState()   // valor en escala 0-100
     data class Calculated(val value: Float) : RecordState()
 }
 
@@ -20,11 +19,10 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
     private val repository = SettingsRepository(application)
 
     companion object {
-        const val LISTEN_DURATION_SECONDS = 3f   // ajustable aquí
-        private const val DEFAULT_RANGE_WIDTH = 8f  // amplada del rang en escala 0-100
+        const val LISTEN_DURATION_SECONDS = 3f
+        private const val RANGE_MAX = 100f
     }
 
-    // Estat de cada nivell
     private val _states = MutableStateFlow<Map<DynamicLevel, RecordState>>(
         DynamicLevel.values().associateWith { RecordState.Idle }
     )
@@ -33,18 +31,30 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
-    private var recordingJob: Job? = null
+    // Per mostrar el mesurador en temps real durant l'enregistrament
+    private val _liveDb = MutableStateFlow<Float?>(null)   // en escala 0-100
+    val liveDb: StateFlow<Float?> = _liveDb
 
+    private val _recordingLevel = MutableStateFlow<DynamicLevel?>(null)
+    val recordingLevel: StateFlow<DynamicLevel?> = _recordingLevel
+
+    private var recordingJob: Job? = null
+    @androidx.annotation.RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
     fun startRecording(level: DynamicLevel) {
-        // Evita començar un nou enregistrament si ja n’hi ha un en curs
         if (recordingJob?.isActive == true) return
 
-        // Marca com a Recording
+        // Comprovar que el nivell no estigui ja enregistrat
+        if (_states.value[level] is RecordState.Recorded) {
+            _errorMessage.value = "${level.symbol} ja té un valor enregistrat."
+            return
+        }
+
+        _errorMessage.value = null
+        _recordingLevel.value = level
         updateState(level, RecordState.Recording)
 
         recordingJob = viewModelScope.launch  {
             try {
-                // Recull dBFS durant LISTEN_DURATION_SECONDS
                 val values = mutableListOf<Float>()
                 val startTime = System.currentTimeMillis()
                 val durationMs = (LISTEN_DURATION_SECONDS * 1000).toLong()
@@ -53,57 +63,123 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
                     .takeWhile { System.currentTimeMillis() - startTime < durationMs }
                     .collect { db ->
                         values.add(db)
+                        // Actualitza el mesurador en directe (escala 0-100)
+                        _liveDb.value = ScaleConverter.dbToScale(db)
                     }
 
                 if (values.isNotEmpty()) {
-                    // Converteix cada dB a escala 0-100 i fa la mitjana
                     val avgDb = values.average().toFloat()
                     val avgScale = ScaleConverter.dbToScale(avgDb)
-                    updateState(level, RecordState.Recorded(avgScale))
+                    val rounded = avgScale.coerceIn(0f, 100f)
+
+                    // Validació seqüencial: ha de ser més alt que el màxim de l'anterior
+                    val previousMax = getPreviousMax(level)
+                    if (level != DynamicLevel.PP && rounded <= previousMax) {
+                        _errorMessage.value = "El valor de ${level.symbol} ha de ser superior a ${
+                            previousMax.toInt()
+                        } (màxim de la dinàmica anterior)."
+                        updateState(level, RecordState.Idle)
+                    } else {
+                        updateState(level, RecordState.Recorded(rounded))
+                    }
                 } else {
                     updateState(level, RecordState.Idle)
+                    _errorMessage.value = "No s'ha pogut capturar cap valor."
                 }
             } catch (e: Exception) {
                 updateState(level, RecordState.Idle)
+                _errorMessage.value = "Error durant l'enregistrament."
+            } finally {
+                _recordingLevel.value = null
+                _liveDb.value = null
             }
         }
+    }
+
+    private fun getPreviousMax(level: DynamicLevel): Float {
+        val ordered = DynamicLevel.values()
+        val idx = ordered.indexOf(level)
+        if (idx <= 0) return -1f
+        // Mirem el màxim de la dinàmica anterior segons els estats actuals
+        val prevLevel = ordered[idx - 1]
+        val prevState = _states.value[prevLevel]
+        return when (prevState) {
+            is RecordState.Recorded -> {
+                // Calculem el seu màxim segons la regla del 75%
+                computeMax(prevLevel, prevState.value)
+            }
+            is RecordState.Calculated -> prevState.value  // ja és el màxim calculat
+            else -> 0f
+        }
+    }
+
+    // Calcula el màxim d'una dinàmica a partir del valor enregistrat (excepte FF)
+    private fun computeMax(level: DynamicLevel, recordedValue: Float): Float {
+        if (level == DynamicLevel.FF) return RANGE_MAX
+        val min = if (level == DynamicLevel.PP) 0f else getPreviousMax(level)
+        // valor = min + 0.75 * (max - min)  =>  max = min + (valor - min) / 0.75
+        val maxCandidate = min + (recordedValue - min) / 0.75f
+        return maxCandidate.coerceIn(min + 1f, RANGE_MAX - 1f)
     }
 
     fun calculateIntermediates() {
         _errorMessage.value = null
         val currentStates = _states.value
-        val ppState = currentStates[DynamicLevel.PP]
-        val ffState = currentStates[DynamicLevel.FF]
 
-        // Comprova que PP i FF tinguin un valor registrat
-        if (ppState !is RecordState.Recorded || ffState !is RecordState.Recorded) {
-            val missing = mutableListOf<String>()
-            if (ppState !is RecordState.Recorded) missing.add("pp")
-            if (ffState !is RecordState.Recorded) missing.add("ff")
-            _errorMessage.value = "Cal enregistrar: ${missing.joinToString(", ")}"
+        val ppVal = (currentStates[DynamicLevel.PP] as? RecordState.Recorded)?.value
+        val ffVal = (currentStates[DynamicLevel.FF] as? RecordState.Recorded)?.value
+        if (ppVal == null || ffVal == null) {
+            _errorMessage.value = "Cal enregistrar pp i ff"
+            return
+        }
+        if (ffVal <= ppVal) {
+            _errorMessage.value = "ff ha de ser més gran que pp"
             return
         }
 
-        val ppVal = ppState.value
-        val ffVal = ffState.value
-
-        // Interpolació lineal per als nivells entremig
-        val step = (ffVal - ppVal) / 4f
-        val pVal  = ppVal + step
-        val mfVal = ppVal + 2 * step
-        val fVal  = ppVal + 3 * step
-
-        // Actualitza els estats: si no estaven ja enregistrats, els marca com a Calculated
-        val updated = currentStates.toMutableMap()
-        listOf(
-            DynamicLevel.P to pVal,
-            DynamicLevel.MF to mfVal,
-            DynamicLevel.F to fVal
-        ).forEach { (level, value) ->
-            if (updated[level] !is RecordState.Recorded) {
-                updated[level] = RecordState.Calculated(value)
-            }
+        // Recollim totes les gravacions disponibles
+        val recorded = mutableListOf<Pair<DynamicLevel, Float>>()
+        DynamicLevel.values().forEach { level ->
+            val state = currentStates[level]
+            if (state is RecordState.Recorded) recorded.add(level to state.value)
         }
+
+        val updated = currentStates.toMutableMap()
+        if (recorded.size == 2) {
+            // Només PP i FF – repartiment uniforme
+            val totalGap = ffVal - ppVal
+            val step = totalGap / 4f
+            updated[DynamicLevel.PP] = RecordState.Calculated(ppVal)
+            updated[DynamicLevel.P]  = RecordState.Calculated(ppVal + step)
+            updated[DynamicLevel.MF] = RecordState.Calculated(ppVal + 2 * step)
+            updated[DynamicLevel.F]  = RecordState.Calculated(ppVal + 3 * step)
+            updated[DynamicLevel.FF] = RecordState.Calculated(ffVal)
+        } else {
+            // Totes o algunes – mètode dels punts mitjos
+            // Ordenem per ordre natural (PP, P, MF, F, FF)
+            val ordered = DynamicLevel.values().toList()
+            var previousValue = 0f   // per a PP, el mínim és 0
+            var previousLevel: DynamicLevel? = null
+            for (level in ordered) {
+                val currentValue = when (level) {
+                    DynamicLevel.PP -> ppVal
+                    DynamicLevel.FF -> ffVal
+                    else -> (currentStates[level] as? RecordState.Recorded)?.value
+                }
+                if (currentValue != null) {
+                    if (previousLevel != null) {
+                        // El límit entre l'anterior i aquest és el punt mig
+                        val boundary = (previousValue + currentValue) / 2f
+                        updated[previousLevel] = RecordState.Calculated(boundary)
+                    }
+                    previousValue = currentValue
+                    previousLevel = level
+                }
+            }
+            // L'últim nivell (FF) té màxim 100
+            updated[DynamicLevel.FF] = RecordState.Calculated(100f)
+        }
+
         _states.value = updated
     }
 
@@ -111,33 +187,34 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             val profileName = repository.activeProfileName.first()
             val currentStates = _states.value
+            var previousMax = 0f
             for (level in DynamicLevel.values()) {
-                val state = currentStates[level] ?: continue
-                val center = when (state) {
-                    is RecordState.Recorded -> state.value
+                val state = currentStates[level]
+                val max = when (state) {
                     is RecordState.Calculated -> state.value
+                    is RecordState.Recorded -> {
+                        // Si no s'ha calculat, fem servir el valor enregistrat com a màxim temporal
+                        state.value
+                    }
                     else -> continue
                 }
-                val halfWidth = DEFAULT_RANGE_WIDTH / 2f
-                val min = (center - halfWidth).coerceIn(0f, 100f)
-                val max = (center + halfWidth).coerceIn(0f, 100f)
+                val min = if (level == DynamicLevel.PP) 0f else previousMax + 1f
                 val dbMin = ScaleConverter.scaleToDb(min)
-                val dbMax = ScaleConverter.scaleToDb(max)
+                val dbMax = ScaleConverter.scaleToDb(max.coerceIn(min + 1f, 100f))
                 repository.saveRange(profileName, level, DynamicRange(dbMin, dbMax))
+                previousMax = max
             }
             _errorMessage.value = "Rangs aplicats!"
         }
     }
 
-    suspend fun resetToDefaults(profileName: String) {
-        val defaults = if (profileName == "Concert") DefaultProfiles.CONCERT else DefaultProfiles.HOME
-        defaults.ranges.forEach { (level, range) ->
-            saveRange(profileName, level, range)
+    fun resetToDefaults() {
+        viewModelScope.launch {
+            val profileName = repository.activeProfileName.first()
+            repository.resetToDefaults(profileName)
+            _states.value = DynamicLevel.values().associateWith { RecordState.Idle }
+            _errorMessage.value = "Valors predeterminats restaurats."
         }
-    }
-
-    fun clearError() {
-        _errorMessage.value = null
     }
 
     private fun updateState(level: DynamicLevel, state: RecordState) {
