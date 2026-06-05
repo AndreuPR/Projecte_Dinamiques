@@ -7,7 +7,7 @@ import androidx.navigation.compose.composable
 import com.example.cridar.ui.screens.listening.ListeningScreen
 import com.example.cridar.ui.screens.shouting.ShoutingScreen
 import com.example.cridar.ui.screens.welcome.WelcomeScreen
-import com.example.shoutdetector.ui.screens.settings.SettingsScreen
+import com.example.cridar.ui.screens.settings.SettingsScreen
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {

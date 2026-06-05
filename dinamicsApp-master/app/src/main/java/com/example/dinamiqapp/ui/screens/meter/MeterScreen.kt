@@ -79,6 +79,7 @@ fun MeterScreen(
             }
         }
     } else {
+        androidx.compose.ui.platform.LocalView.current.keepScreenOn = true
         Box(
             modifier = Modifier
                 .fillMaxSize()

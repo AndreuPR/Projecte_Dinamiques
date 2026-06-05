@@ -1,4 +1,4 @@
-package com.example.shoutdetector.ui.screens.settings
+package com.example.cridar.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*

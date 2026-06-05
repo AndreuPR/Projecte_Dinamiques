@@ -11,7 +11,7 @@ import com.example.cridar.data.ShoutRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
-class ListeningViewModel(application: Application, private val tts: TextToSpeechManager? = null) : AndroidViewModel(application) {
+class ListeningViewModel(application: Application,) : AndroidViewModel(application) {
     private val repository = ShoutRepository(application)
 
     private val _isShouting = MutableStateFlow(false)
@@ -47,12 +47,5 @@ class ListeningViewModel(application: Application, private val tts: TextToSpeech
         listeningJob?.cancel()
     }
 
-    private suspend fun onShout() {
-        _isShouting.value = true
-        val voiceEnabled = repository.voiceEnabled.first()
-        if (voiceEnabled) {
-            tts?.speak("Estàs cridant")
-        }
-        stopListening()
-    }
+
 }

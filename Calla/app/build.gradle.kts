@@ -9,16 +9,33 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.dynamicsapp"
+        applicationId = "com.cridar"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0-beta"
     }
 
+    flavorDimensions += "versio"
+
+    // 2. Creem els diferents "sabors" (versions) que vols tenir al mòbil a la vegada
+    productFlavors {
+        create("estable") {
+            dimension = "versio"
+            // Aquesta serà l'app original. No li posem sufix.
+            manifestPlaceholders["appName"] = "No Cridis Original"
+        }
+        create("v3") {
+            dimension = "versio"
+            applicationIdSuffix = ".v1" // ID: com.dynamicsapp.v1
+            manifestPlaceholders["appName"] = "No Cridis  v3"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -34,6 +51,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

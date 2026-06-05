@@ -22,7 +22,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 navigationIcon = { TextButton(onClick = onBack) { Text("←") } })
         },
         bottomBar = {
-            Row(modifier = Modifier.fillMaxWidth().padding(16.dp),
+            Row(modifier = Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Button(onClick = { viewModel.save() },
                     modifier = Modifier.weight(1f).height(56.dp)) {

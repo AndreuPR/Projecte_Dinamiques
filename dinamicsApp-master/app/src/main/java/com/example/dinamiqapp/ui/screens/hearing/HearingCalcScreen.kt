@@ -60,6 +60,7 @@ fun HearingCalcScreen(
 
     // Superposició d'enregistrament
     if (recordingLevel != null) {
+        androidx.compose.ui.platform.LocalView.current.keepScreenOn = true
         Box(
             modifier = Modifier
                 .fillMaxSize()

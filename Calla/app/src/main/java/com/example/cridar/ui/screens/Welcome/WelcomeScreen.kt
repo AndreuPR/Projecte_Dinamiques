@@ -20,7 +20,7 @@ fun WelcomeScreen(
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Shout Detector", fontSize = 36.sp, fontWeight = FontWeight.Bold)
+            Text("No Cridis!", fontSize = 36.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(48.dp))
             Button(onClick = onStart, modifier = Modifier.fillMaxWidth(0.7f).height(56.dp)) {
                 Text("Començar", fontSize = 18.sp)

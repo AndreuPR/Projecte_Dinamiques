@@ -1,4 +1,4 @@
-package com.example.shoutdetector.ui.screens.settings
+package com.example.cridar.ui.screens.settings
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel

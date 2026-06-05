@@ -16,19 +16,45 @@ android {
         versionName = "1.0-beta"
     }
 
+    flavorDimensions += "versio"
+
+    // 2. Creem els diferents "sabors" (versions) que vols tenir al mòbil a la vegada
+    productFlavors {
+        create("estable") {
+            dimension = "versio"
+            // Aquesta serà l'app original. No li posem sufix.
+            manifestPlaceholders["appName"] = "DinamiqApp Original"
+        }
+        create("v3") {
+            dimension = "versio"
+            applicationIdSuffix = ".v3" // ID: com.dynamicsapp.v3
+            manifestPlaceholders["appName"] = "DinamiqApp v3"
+        }
+        create("v4") {
+            dimension = "versio"
+            applicationIdSuffix = ".v4" // ID: com.dynamicsapp.v4
+            manifestPlaceholders["appName"] = "DinamiqApp v4"
+        }
+        create("v5") {
+            dimension = "versio"
+            applicationIdSuffix = ".v5" // Clau: farà que l'ID sigui com.dynamicsapp.v5
+            manifestPlaceholders["appName"] = "DinamiqApp v5" // El nom al mòbil
+        }
+        create("v6") {
+            dimension = "versio"
+            applicationIdSuffix = ".v6" // Clau: farà que l'ID sigui com.dynamicsapp.v5
+            manifestPlaceholders["appName"] = "DinamiqApp v6" // El nom al mòbil
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // El nom que tindrà l'app oficial instal·lada
-            manifestPlaceholders["appName"] = "DinamiqApp"
         }
         debug {
-            // Això farà que l'ID sigui "com.dynamicsapp.dev"
-            applicationIdSuffix = ".dev"
-            // El nom que tindrà aquesta versió de proves al mòbil
-            manifestPlaceholders["appName"] = "DinamiqApp DEV"
+            // Eliminem el sufix d'aquí perquè ja el controlen els flavors de dalt
         }
-    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -54,4 +80,6 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
     debugImplementation(libs.androidx.ui.tooling)
+}
+
 }

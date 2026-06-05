@@ -54,7 +54,7 @@ private val DarkColors = darkColorScheme(
 )
 
 @Composable
-fun DynamicsAppTheme(
+fun ShoutDetectorTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {

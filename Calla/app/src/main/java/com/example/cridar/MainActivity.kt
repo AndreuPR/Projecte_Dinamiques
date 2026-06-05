@@ -1,4 +1,4 @@
-package com.example.shoutdetector
+package com.example.cridar
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
