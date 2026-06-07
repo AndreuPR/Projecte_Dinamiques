@@ -40,8 +40,8 @@ class AppSettingsViewModel(application: Application) : AndroidViewModel(applicat
             repository.setAppMaxDb(max)
             repository.setAppRefreshMs(refresh)
             // Actualitza el ScaleConverter global
-            ScaleConverter.minDb = min
-            ScaleConverter.maxDb = max
+            ScaleConverter.appMinDb = min
+            ScaleConverter.appMaxDb = max
         }
     }
 }

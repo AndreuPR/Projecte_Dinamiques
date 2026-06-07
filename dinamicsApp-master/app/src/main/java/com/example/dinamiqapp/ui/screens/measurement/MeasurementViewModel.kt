@@ -28,6 +28,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
             val rangesFlow = repository.profileRanges(profileName)
 
             AudioMeter.dbFlow(refreshMs).combine(rangesFlow) { db, ranges ->
+                ScaleConverter.updateFromRanges(ranges)
                 val intensity = ScaleConverter.dbToScale(db).roundToInt().coerceIn(0, 100)
                 val reading = classifyDb(db, ranges)
                 Triple(intensity, reading.level, reading.precision)

@@ -18,8 +18,8 @@ class MainActivity : ComponentActivity() {
         // Dins de MainActivity.onCreate()
         val repository = SettingsRepository(this)
         lifecycleScope.launch {
-            ScaleConverter.minDb = repository.appMinDb.first()
-            ScaleConverter.maxDb = repository.appMaxDb.first()
+            ScaleConverter.appMinDb = repository.appMinDb.first()
+            ScaleConverter.appMaxDb = repository.appMaxDb.first()
         }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
