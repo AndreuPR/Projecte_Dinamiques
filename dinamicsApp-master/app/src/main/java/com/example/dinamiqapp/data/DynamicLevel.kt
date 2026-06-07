@@ -134,6 +134,7 @@ class SettingsRepository(private val context: Context) {
 // ──────────────────────────────────────────────
 
 fun classifyDb(db: Float, ranges: Map<DynamicLevel, DynamicRange>): AudioReading {
+    // Primer intentem trobar el rang exacte
     for (level in DynamicLevel.values()) {
         val range = ranges[level] ?: continue
         if (db >= range.min && db < range.max) {
@@ -143,5 +144,11 @@ fun classifyDb(db: Float, ranges: Map<DynamicLevel, DynamicRange>): AudioReading
             return AudioReading(db, level, precision.coerceIn(0f, 1f))
         }
     }
-    return AudioReading(db, null, 0f)
+    // Si no hi ha rang exacte (gaps o fora de límits), retornem la dinàmica més propera
+    val nearest = DynamicLevel.values().minByOrNull { level ->
+        val range = ranges[level] ?: return@minByOrNull Float.MAX_VALUE
+        val centre = (range.min + range.max) / 2f
+        kotlin.math.abs(db - centre)
+    }
+    return if (nearest != null) AudioReading(db, nearest, 0f) else AudioReading(db, null, 0f)
 }

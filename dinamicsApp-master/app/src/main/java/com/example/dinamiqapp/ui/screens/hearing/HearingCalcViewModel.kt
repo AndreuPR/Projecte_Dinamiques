@@ -31,7 +31,7 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
         private const val RANGE_MAX = 100f
 
         // Percentil que fem servir per calcular pp (ignora soroll ambient)
-        private const val PP_PERCENTILE = 0.25f
+        private const val PP_PERCENTILE = 0.15f
         // Percentil per ff (ignora pics accidentals)
         private const val FF_PERCENTILE = 0.90f
     }
