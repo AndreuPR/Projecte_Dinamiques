@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.*
 
 sealed class RecordState {
     object Idle : RecordState()
+    data class Countdown(val secondsLeft: Int) : RecordState()
     object Recording : RecordState()
     data class Recorded(val value: Float) : RecordState()   // valor en escala 0-100
     data class Calculated(val value: Float) : RecordState()
@@ -20,6 +21,7 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
 
     companion object {
         const val LISTEN_DURATION_SECONDS = 3f
+        const val COUNTDOWN_SECONDS = 3
         private const val RANGE_MAX = 100f
     }
 
@@ -43,7 +45,6 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
     fun startRecording(level: DynamicLevel) {
         if (recordingJob?.isActive == true) return
 
-        // Comprovar que el nivell no estigui ja enregistrat
         if (_states.value[level] is RecordState.Recorded) {
             _errorMessage.value = "${level.symbol} ja té un valor enregistrat."
             return
@@ -51,10 +52,16 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
 
         _errorMessage.value = null
         _recordingLevel.value = level
-        updateState(level, RecordState.Recording)
 
-        recordingJob = viewModelScope.launch  {
+        recordingJob = viewModelScope.launch {
             try {
+                // Compte enrere abans de gravar
+                for (s in COUNTDOWN_SECONDS downTo 1) {
+                    updateState(level, RecordState.Countdown(s))
+                    delay(1000L)
+                }
+                updateState(level, RecordState.Recording)
+
                 val values = mutableListOf<Float>()
                 val startTime = System.currentTimeMillis()
                 val durationMs = (LISTEN_DURATION_SECONDS * 1000).toLong()
@@ -63,7 +70,6 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
                     .takeWhile { System.currentTimeMillis() - startTime < durationMs }
                     .collect { db ->
                         values.add(db)
-                        // Actualitza el mesurador en directe (escala 0-100)
                         _liveDb.value = ScaleConverter.dbToScale(db)
                     }
 
@@ -72,7 +78,6 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
                     val avgScale = ScaleConverter.dbToScale(avgDb)
                     val rounded = avgScale.coerceIn(0f, 100f)
 
-                    // Validació seqüencial: ha de ser més alt que el màxim de l'anterior
                     val previousMax = getPreviousMax(level)
                     if (level != DynamicLevel.PP && rounded <= previousMax) {
                         _errorMessage.value = "El valor de ${level.symbol} ha de ser superior a ${

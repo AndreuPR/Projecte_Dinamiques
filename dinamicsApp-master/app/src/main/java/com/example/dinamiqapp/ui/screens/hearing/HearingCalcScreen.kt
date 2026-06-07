@@ -58,7 +58,8 @@ fun HearingCalcScreen(
         return
     }
 
-    // Superposició d'enregistrament
+    // Superposició durant compte enrere o enregistrament
+    val activeState = recordingLevel?.let { states[it] }
     if (recordingLevel != null) {
         androidx.compose.ui.platform.LocalView.current.keepScreenOn = true
         Box(
@@ -68,25 +69,44 @@ fun HearingCalcScreen(
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "Enregistrant ${recordingLevel?.symbol}...",
-                    color = Color.White,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                // Mesurador en directe
-                Text(
-                    text = if (liveDb != null) "${liveDb!!.toInt()}" else "--",
-                    color = Color.White,
-                    fontSize = 64.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Intensitat", color = Color.White.copy(alpha = 0.7f), fontSize = 16.sp)
-                Spacer(modifier = Modifier.height(32.dp))
-                // Cercle animat senzill (progrés)
-                CircularProgressIndicator(color = Color.White)
+                when (val s = activeState) {
+                    is RecordState.Countdown -> {
+                        Text(
+                            text = recordingLevel?.symbol ?: "",
+                            color = Color.White,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "${s.secondsLeft}",
+                            color = Color.White,
+                            fontSize = 96.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Prepara't...", color = Color.White.copy(alpha = 0.7f), fontSize = 18.sp)
+                    }
+                    else -> {
+                        Text(
+                            text = "Enregistrant ${recordingLevel?.symbol}...",
+                            color = Color.White,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = if (liveDb != null) "${liveDb!!.toInt()}" else "--",
+                            color = Color.White,
+                            fontSize = 64.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Intensitat", color = Color.White.copy(alpha = 0.7f), fontSize = 16.sp)
+                        Spacer(modifier = Modifier.height(32.dp))
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                }
             }
         }
         return
@@ -114,19 +134,21 @@ fun HearingCalcScreen(
                     is RecordState.Recorded -> Color(0xFF4CAF50)
                     is RecordState.Calculated -> Color(0xFF2196F3)
                     is RecordState.Recording -> Color(0xFFFFC107)
+                    is RecordState.Countdown -> Color(0xFFFF9800)
                     is RecordState.Idle -> MaterialTheme.colorScheme.primary
                 }
                 val text = when (state) {
                     is RecordState.Recorded -> "${level.symbol} (${state.value.toInt()})"
                     is RecordState.Calculated -> "${level.symbol} (max ${state.value.toInt()})"
                     is RecordState.Recording -> "${level.symbol} (Escoltant…)"
+                    is RecordState.Countdown -> "${level.symbol} (${state.secondsLeft}…)"
                     is RecordState.Idle -> level.symbol
                 }
                 Button(
                     onClick = { viewModel.startRecording(level) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
-                    enabled = state !is RecordState.Recording
+                    enabled = state is RecordState.Idle
                 ) {
                     Text(text = text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
