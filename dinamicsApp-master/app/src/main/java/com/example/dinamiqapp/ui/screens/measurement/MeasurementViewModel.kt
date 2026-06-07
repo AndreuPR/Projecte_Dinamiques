@@ -52,8 +52,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
             val voice   = voiceRepository.activeProfile()
             val voiceId = voiceRepository.activeVoiceId.first()
             FilteredAudioSource.setVoice(voice)
-            FilteredAudioSource.similarityThreshold =
-                repository.signalEmaAlpha.first().let { 0.82f } // valor fix per ara
+            FilteredAudioSource.similarityThreshold = repository.voiceSimilarityThreshold.first()
 
             // Keep-learning: actualitza el model quan arriben frames acceptats
             FilteredAudioSource.onFrameAccepted = { mfcc ->

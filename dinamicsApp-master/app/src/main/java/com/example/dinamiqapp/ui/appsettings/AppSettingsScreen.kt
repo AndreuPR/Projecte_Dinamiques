@@ -24,6 +24,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
     val ppPercentile by viewModel.ppPercentile.collectAsState()
     val ffPercentile by viewModel.ffPercentile.collectAsState()
     val keepLearning by viewModel.keepLearning.collectAsState()
+    val similarityThreshold by viewModel.similarityThreshold.collectAsState()
 
     Scaffold(
         topBar = {
@@ -152,6 +153,23 @@ fun AppSettingsScreen(onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            ParamSlider(
+                label = "Llindar de similitud",
+                value = similarityThreshold,
+                valueText = "%.2f".format(similarityThreshold) +
+                    when {
+                        similarityThreshold < 0.65f -> " — molt permissiu (pot filtrar poc)"
+                        similarityThreshold < 0.75f -> " — permissiu"
+                        similarityThreshold < 0.85f -> " — equilibrat"
+                        similarityThreshold < 0.92f -> " — estricte"
+                        else                        -> " — molt estricte"
+                    },
+                onValueChange = { viewModel.updateSimilarityThreshold(it) },
+                range = 0.50f..0.99f
+            )
+
             Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),

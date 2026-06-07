@@ -55,6 +55,16 @@ android {
             applicationIdSuffix = ".v8" // Clau: farà que l'ID sigui com.dynamicsapp.v5
             manifestPlaceholders["appName"] = "Voice_Rec_DinamiqApp2" // El nom al mòbil
         }
+        create("v9") {
+            dimension = "versio"
+            applicationIdSuffix = ".v9" // Clau: farà que l'ID sigui com.dynamicsapp.v5
+            manifestPlaceholders["appName"] = "Voice_Rec_DinamiqApp3" // El nom al mòbil
+        }
+        create("v10") {
+            dimension = "versio"
+            applicationIdSuffix = ".v9" // Clau: farà que l'ID sigui com.dynamicsapp.v5
+            manifestPlaceholders["appName"] = "Voice_Rec_DinamiqApp4" // El nom al mòbil
+        }
     }
 
     buildTypes {
@@ -89,6 +99,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
+    // TensorFlow Lite — motor de reconeixement de veu neuronal
+    implementation("org.tensorflow:tensorflow-lite:2.15.0")
     debugImplementation(libs.androidx.ui.tooling)
 }
 

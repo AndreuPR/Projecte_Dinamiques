@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
+import com.example.dinamiqapp.audio.FilteredAudioSource
 import com.example.dinamiqapp.data.ScaleConverter
 import com.example.dinamiqapp.data.SettingsRepository
 import com.example.dinamiqapp.navigation.AppNavGraph
@@ -16,6 +17,9 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // Dins de MainActivity.onCreate()
+        // Inicialitza el motor TF Lite (carrega yamnet.tflite si existeix)
+        FilteredAudioSource.initialize(this)
+
         val repository = SettingsRepository(this)
         lifecycleScope.launch {
             ScaleConverter.appMinDb = repository.appMinDb.first()

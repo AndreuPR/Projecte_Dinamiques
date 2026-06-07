@@ -3,6 +3,7 @@ package com.example.dinamiqapp.ui.screens.appsettings
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.dinamiqapp.audio.FilteredAudioSource
 import com.example.dinamiqapp.data.ScaleConverter
 import com.example.dinamiqapp.data.SettingsRepository
 import com.example.dinamiqapp.data.VoiceRepository
@@ -23,7 +24,8 @@ class AppSettingsViewModel(application: Application) : AndroidViewModel(applicat
     private val _hysteresis = MutableStateFlow(3)
     private val _ppPercentile = MutableStateFlow(0.15f)
     private val _ffPercentile  = MutableStateFlow(0.90f)
-    private val _keepLearning  = MutableStateFlow(false)
+    private val _keepLearning        = MutableStateFlow(false)
+    private val _similarityThreshold = MutableStateFlow(0.82f)
 
     val minDb: StateFlow<Float> = _minDb
     val maxDb: StateFlow<Float> = _maxDb
@@ -33,6 +35,7 @@ class AppSettingsViewModel(application: Application) : AndroidViewModel(applicat
     val ppPercentile: StateFlow<Float> = _ppPercentile
     val ffPercentile: StateFlow<Float>  = _ffPercentile
     val keepLearning: StateFlow<Boolean> = _keepLearning
+    val similarityThreshold: StateFlow<Float> = _similarityThreshold
 
     init {
         viewModelScope.launch {
@@ -44,6 +47,7 @@ class AppSettingsViewModel(application: Application) : AndroidViewModel(applicat
             repository.signalPpPercentile.first().let { _ppPercentile.value = it }
             repository.signalFfPercentile.first().let { _ffPercentile.value = it }
             voiceRepository.keepLearning.first().let { _keepLearning.value = it }
+            repository.voiceSimilarityThreshold.first().let { _similarityThreshold.value = it }
         }
     }
 
@@ -55,6 +59,7 @@ class AppSettingsViewModel(application: Application) : AndroidViewModel(applicat
     fun updatePpPercentile(value: Float) { _ppPercentile.value = value }
     fun updateFfPercentile(value: Float) { _ffPercentile.value = value }
     fun updateKeepLearning(value: Boolean) { _keepLearning.value = value }
+    fun updateSimilarityThreshold(value: Float) { _similarityThreshold.value = value }
 
     fun save() {
         viewModelScope.launch {
@@ -72,6 +77,9 @@ class AppSettingsViewModel(application: Application) : AndroidViewModel(applicat
             repository.setSignalPpPercentile(_ppPercentile.value.coerceIn(0.05f, 0.40f))
             repository.setSignalFfPercentile(_ffPercentile.value.coerceIn(0.60f, 0.99f))
             voiceRepository.setKeepLearning(_keepLearning.value)
+            val sim = _similarityThreshold.value.coerceIn(0.50f, 0.99f)
+            repository.setVoiceSimilarityThreshold(sim)
+            FilteredAudioSource.similarityThreshold = sim
         }
     }
 }

@@ -77,7 +77,8 @@ class SettingsRepository(private val context: Context) {
     val signalEmaAlpha: Flow<Float> = context.dataStore.data.map { it[SIGNAL_EMA_ALPHA] ?: 0.25f }
     val signalHysteresis: Flow<Int> = context.dataStore.data.map { it[SIGNAL_HYSTERESIS] ?: 3 }
     val signalPpPercentile: Flow<Float> = context.dataStore.data.map { it[SIGNAL_PP_PERCENTILE] ?: 0.15f }
-    val signalFfPercentile: Flow<Float> = context.dataStore.data.map { it[SIGNAL_FF_PERCENTILE] ?: 0.90f }
+    val signalFfPercentile: Flow<Float>        = context.dataStore.data.map { it[SIGNAL_FF_PERCENTILE] ?: 0.90f }
+    val voiceSimilarityThreshold: Flow<Float>  = context.dataStore.data.map { it[VOICE_SIMILARITY] ?: 0.82f }
 
     companion object {
         private val ACTIVE_PROFILE = stringPreferencesKey("active_profile")
@@ -88,6 +89,7 @@ class SettingsRepository(private val context: Context) {
         private val SIGNAL_HYSTERESIS = intPreferencesKey("signal_hysteresis")
         private val SIGNAL_PP_PERCENTILE = floatPreferencesKey("signal_pp_percentile")
         private val SIGNAL_FF_PERCENTILE = floatPreferencesKey("signal_ff_percentile")
+        private val VOICE_SIMILARITY     = floatPreferencesKey("voice_similarity_threshold")
         private fun rangeKey(profile: String, level: DynamicLevel, isMin: Boolean) =
             floatPreferencesKey("${profile}_${level.name}_${if (isMin) "min" else "max"}")
     }
@@ -124,7 +126,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setSignalEmaAlpha(value: Float) { context.dataStore.edit { it[SIGNAL_EMA_ALPHA] = value } }
     suspend fun setSignalHysteresis(value: Int) { context.dataStore.edit { it[SIGNAL_HYSTERESIS] = value } }
     suspend fun setSignalPpPercentile(value: Float) { context.dataStore.edit { it[SIGNAL_PP_PERCENTILE] = value } }
-    suspend fun setSignalFfPercentile(value: Float) { context.dataStore.edit { it[SIGNAL_FF_PERCENTILE] = value } }
+    suspend fun setSignalFfPercentile(value: Float)       { context.dataStore.edit { it[SIGNAL_FF_PERCENTILE] = value } }
+    suspend fun setVoiceSimilarityThreshold(value: Float) { context.dataStore.edit { it[VOICE_SIMILARITY] = value } }
 
     suspend fun saveRange(profileName: String, level: DynamicLevel, range: DynamicRange) {
         context.dataStore.edit { prefs ->
