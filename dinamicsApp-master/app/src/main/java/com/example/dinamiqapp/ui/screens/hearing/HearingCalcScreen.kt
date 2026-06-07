@@ -6,12 +6,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.dinamiqapp.data.DynamicLevel
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +32,9 @@ fun HearingCalcScreen(
     val errorMessage by viewModel.errorMessage.collectAsState()
     val liveDb by viewModel.liveDb.collectAsState()
     val recordingLevel by viewModel.recordingLevel.collectAsState()
+    val flyState by viewModel.flyState.collectAsState()
+
+    var selectedDuration by remember { mutableIntStateOf(10) }
 
     var hasPermission by remember {
         mutableStateOf(
@@ -58,7 +60,7 @@ fun HearingCalcScreen(
         return
     }
 
-    // Superposició durant compte enrere o enregistrament
+    // Superposició gravació per nivells individuals
     val activeState = recordingLevel?.let { states[it] }
     if (recordingLevel != null) {
         androidx.compose.ui.platform.LocalView.current.keepScreenOn = true
@@ -112,6 +114,79 @@ fun HearingCalcScreen(
         return
     }
 
+    // Superposició gravació "al vol"
+    if (flyState !is FlyState.Idle) {
+        androidx.compose.ui.platform.LocalView.current.keepScreenOn = true
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.85f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+                when (val fs = flyState) {
+                    is FlyState.Countdown -> {
+                        Text("Al vol", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "${fs.secondsLeft}",
+                            color = Color(0xFFFF9800),
+                            fontSize = 96.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Prepara't... toca de pp a ff!", color = Color.White.copy(alpha = 0.7f), fontSize = 16.sp)
+                    }
+                    is FlyState.Recording -> {
+                        Text("Tocant...", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "${fs.secondsLeft}s",
+                            color = Color(0xFFFFC107),
+                            fontSize = 64.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        // Valor en directe
+                        Text(
+                            text = if (fs.liveDb != null) "${fs.liveDb.toInt()}" else "--",
+                            color = Color.White,
+                            fontSize = 48.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text("Ara", color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(24.dp))
+                        // Mínim i màxim detectats
+                        Row(horizontalArrangement = Arrangement.spacedBy(48.dp)) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = if (fs.minDb != null) "${fs.minDb.toInt()}" else "--",
+                                    color = Color(0xFF90CAF9),
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text("Mínim (pp)", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = if (fs.maxDb != null) "${fs.maxDb.toInt()}" else "--",
+                                    color = Color(0xFFEF9A9A),
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text("Màxim (ff)", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(32.dp))
+                        CircularProgressIndicator(color = Color(0xFFFFC107))
+                    }
+                    else -> {}
+                }
+            }
+        }
+        return
+    }
+
     // Pantalla principal
     Scaffold(
         topBar = {
@@ -125,9 +200,57 @@ fun HearingCalcScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Botó "Al vol" amb selector de durada
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "Mesura al vol",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        "Toca de pp a ff durant el temps escollit",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    // Selector de durada
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(5, 10, 15, 30).forEach { seconds ->
+                            FilterChip(
+                                selected = selectedDuration == seconds,
+                                onClick = { selectedDuration = seconds },
+                                label = { Text("${seconds}s") }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = { viewModel.startFlyRecording(selectedDuration) },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B1FA2))
+                    ) {
+                        Text("▶  Iniciar mesura al vol (${selectedDuration}s)", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Botons per nivell individual
             DynamicLevel.values().forEach { level ->
                 val state = states[level] ?: RecordState.Idle
                 val buttonColor = when (state) {
@@ -160,7 +283,7 @@ fun HearingCalcScreen(
             errorMessage?.let { msg ->
                 Text(
                     text = msg,
-                    color = MaterialTheme.colorScheme.error,
+                    color = if (msg == "Rangs aplicats!") Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(8.dp)
                 )

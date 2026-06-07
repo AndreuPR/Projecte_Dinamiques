@@ -16,6 +16,12 @@ sealed class RecordState {
     data class Calculated(val value: Float) : RecordState()
 }
 
+sealed class FlyState {
+    object Idle : FlyState()
+    data class Countdown(val secondsLeft: Int) : FlyState()
+    data class Recording(val secondsLeft: Int, val liveDb: Float?, val minDb: Float?, val maxDb: Float?) : FlyState()
+}
+
 class HearingCalcViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = SettingsRepository(application)
 
@@ -39,6 +45,11 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _recordingLevel = MutableStateFlow<DynamicLevel?>(null)
     val recordingLevel: StateFlow<DynamicLevel?> = _recordingLevel
+
+    private val _flyState = MutableStateFlow<FlyState>(FlyState.Idle)
+    val flyState: StateFlow<FlyState> = _flyState
+
+    private var flyJob: Job? = null
 
     private var recordingJob: Job? = null
     @androidx.annotation.RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
@@ -97,6 +108,61 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
             } finally {
                 _recordingLevel.value = null
                 _liveDb.value = null
+            }
+        }
+    }
+
+    @androidx.annotation.RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
+    fun startFlyRecording(durationSeconds: Int) {
+        if (flyJob?.isActive == true || recordingJob?.isActive == true) return
+        _errorMessage.value = null
+
+        flyJob = viewModelScope.launch {
+            try {
+                // Compte enrere
+                for (s in COUNTDOWN_SECONDS downTo 1) {
+                    _flyState.value = FlyState.Countdown(s)
+                    delay(1000L)
+                }
+
+                // Gravació: captura mínim i màxim
+                var minDb: Float? = null
+                var maxDb: Float? = null
+                val startTime = System.currentTimeMillis()
+                val durationMs = durationSeconds * 1000L
+
+                AudioMeter.dbFlow()
+                    .takeWhile { System.currentTimeMillis() - startTime < durationMs }
+                    .collect { db ->
+                        val scale = ScaleConverter.dbToScale(db)
+                        if (minDb == null || scale < minDb!!) minDb = scale
+                        if (maxDb == null || scale > maxDb!!) maxDb = scale
+                        val secondsLeft = ((durationMs - (System.currentTimeMillis() - startTime)) / 1000L).toInt() + 1
+                        _flyState.value = FlyState.Recording(secondsLeft, scale, minDb, maxDb)
+                    }
+
+                // Calcula i omple els estats com a Calculated
+                val mn = minDb
+                val mx = maxDb
+                if (mn == null || mx == null || mx - mn < 2f) {
+                    _errorMessage.value = "Rang massa petit. Toca des de pp fins a ff!"
+                    _flyState.value = FlyState.Idle
+                    return@launch
+                }
+
+                val step = (mx - mn) / 4f
+                val updated = _states.value.toMutableMap()
+                updated[DynamicLevel.PP] = RecordState.Calculated(mn + step)
+                updated[DynamicLevel.P]  = RecordState.Calculated(mn + step * 2f)
+                updated[DynamicLevel.MF] = RecordState.Calculated(mn + step * 3f)
+                updated[DynamicLevel.F]  = RecordState.Calculated(mn + step * 4f - 1f)
+                updated[DynamicLevel.FF] = RecordState.Calculated(mx)
+                _states.value = updated
+
+            } catch (e: Exception) {
+                _errorMessage.value = "Error durant la gravació al vol."
+            } finally {
+                _flyState.value = FlyState.Idle
             }
         }
     }
