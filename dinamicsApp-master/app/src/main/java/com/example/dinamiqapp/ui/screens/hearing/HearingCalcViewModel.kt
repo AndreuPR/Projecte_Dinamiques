@@ -29,11 +29,17 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
         const val LISTEN_DURATION_SECONDS = 3f
         const val COUNTDOWN_SECONDS = 3
         private const val RANGE_MAX = 100f
+    }
 
-        // Percentil que fem servir per calcular pp (ignora soroll ambient)
-        private const val PP_PERCENTILE = 0.15f
-        // Percentil per ff (ignora pics accidentals)
-        private const val FF_PERCENTILE = 0.90f
+    // Percentils llegits del DataStore (valors per defecte fins que es carreguen)
+    private var ppPercentile = 0.15f
+    private var ffPercentile = 0.90f
+
+    init {
+        viewModelScope.launch {
+            ppPercentile = repository.signalPpPercentile.first()
+            ffPercentile = repository.signalFfPercentile.first()
+        }
     }
 
     private fun percentile(values: List<Float>, p: Float): Float {
@@ -101,8 +107,8 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
                     // FF: agafem el percentil 90 (ignora pics accidentals)
                     // Resta: mitjana central (percentil 50)
                     val representativeScale = when (level) {
-                        DynamicLevel.PP -> percentile(scaleValues, PP_PERCENTILE)
-                        DynamicLevel.FF -> percentile(scaleValues, FF_PERCENTILE)
+                        DynamicLevel.PP -> percentile(scaleValues, ppPercentile)
+                        DynamicLevel.FF -> percentile(scaleValues, ffPercentile)
                         else -> percentile(scaleValues, 0.50f)
                     }
                     val rounded = representativeScale.coerceIn(0f, 100f)
@@ -154,8 +160,8 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
                         val scale = ScaleConverter.dbToScale(db)
                         allScales.add(scale)
                         // Per mostrar en directe: percentil actual de pp i ff
-                        val liveMin = if (allScales.size > 5) percentile(allScales, PP_PERCENTILE) else null
-                        val liveMax = if (allScales.size > 5) percentile(allScales, FF_PERCENTILE) else null
+                        val liveMin = if (allScales.size > 5) percentile(allScales, ppPercentile) else null
+                        val liveMax = if (allScales.size > 5) percentile(allScales, ffPercentile) else null
                         val secondsLeft = ((durationMs - (System.currentTimeMillis() - startTime)) / 1000L).toInt() + 1
                         _flyState.value = FlyState.Recording(secondsLeft, scale, liveMin, liveMax)
                     }
@@ -167,8 +173,8 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
                     return@launch
                 }
 
-                val mn = percentile(allScales, PP_PERCENTILE)
-                val mx = percentile(allScales, FF_PERCENTILE)
+                val mn = percentile(allScales, ppPercentile)
+                val mx = percentile(allScales, ffPercentile)
 
                 if (mx - mn < 2f) {
                     _errorMessage.value = "Rang massa petit. Toca des de pp fins a ff!"

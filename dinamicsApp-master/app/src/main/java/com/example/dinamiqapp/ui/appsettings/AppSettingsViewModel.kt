@@ -11,25 +11,44 @@ import kotlinx.coroutines.launch
 class AppSettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = SettingsRepository(application)
 
+    // Àudio global
     private val _minDb = MutableStateFlow(-70f)
     private val _maxDb = MutableStateFlow(0f)
     private val _refreshMs = MutableStateFlow(200)
 
+    // Motor de senyal
+    private val _emaAlpha = MutableStateFlow(0.25f)
+    private val _hysteresis = MutableStateFlow(3)
+    private val _ppPercentile = MutableStateFlow(0.15f)
+    private val _ffPercentile = MutableStateFlow(0.90f)
+
     val minDb: StateFlow<Float> = _minDb
     val maxDb: StateFlow<Float> = _maxDb
     val refreshMs: StateFlow<Int> = _refreshMs
+    val emaAlpha: StateFlow<Float> = _emaAlpha
+    val hysteresis: StateFlow<Int> = _hysteresis
+    val ppPercentile: StateFlow<Float> = _ppPercentile
+    val ffPercentile: StateFlow<Float> = _ffPercentile
 
     init {
         viewModelScope.launch {
             repository.appMinDb.first().let { _minDb.value = it }
             repository.appMaxDb.first().let { _maxDb.value = it }
             repository.appRefreshMs.first().let { _refreshMs.value = it }
+            repository.signalEmaAlpha.first().let { _emaAlpha.value = it }
+            repository.signalHysteresis.first().let { _hysteresis.value = it }
+            repository.signalPpPercentile.first().let { _ppPercentile.value = it }
+            repository.signalFfPercentile.first().let { _ffPercentile.value = it }
         }
     }
 
     fun updateMinDb(value: Float) { _minDb.value = value }
     fun updateMaxDb(value: Float) { _maxDb.value = value }
     fun updateRefreshMs(value: Int) { _refreshMs.value = value }
+    fun updateEmaAlpha(value: Float) { _emaAlpha.value = value }
+    fun updateHysteresis(value: Int) { _hysteresis.value = value }
+    fun updatePpPercentile(value: Float) { _ppPercentile.value = value }
+    fun updateFfPercentile(value: Float) { _ffPercentile.value = value }
 
     fun save() {
         viewModelScope.launch {
@@ -39,9 +58,13 @@ class AppSettingsViewModel(application: Application) : AndroidViewModel(applicat
             repository.setAppMinDb(min)
             repository.setAppMaxDb(max)
             repository.setAppRefreshMs(refresh)
-            // Actualitza el ScaleConverter global
             ScaleConverter.appMinDb = min
             ScaleConverter.appMaxDb = max
+
+            repository.setSignalEmaAlpha(_emaAlpha.value.coerceIn(0.05f, 1.0f))
+            repository.setSignalHysteresis(_hysteresis.value.coerceIn(1, 10))
+            repository.setSignalPpPercentile(_ppPercentile.value.coerceIn(0.05f, 0.40f))
+            repository.setSignalFfPercentile(_ffPercentile.value.coerceIn(0.60f, 0.99f))
         }
     }
 }
