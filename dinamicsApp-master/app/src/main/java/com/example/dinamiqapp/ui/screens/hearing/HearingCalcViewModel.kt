@@ -3,8 +3,9 @@ package com.example.dinamiqapp.ui.screens.hearing
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.dinamiqapp.audio.AudioMeter
+import com.example.dinamiqapp.audio.FilteredAudioSource
 import com.example.dinamiqapp.data.*
+import com.example.dinamiqapp.data.VoiceRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -39,6 +40,8 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             ppPercentile = repository.signalPpPercentile.first()
             ffPercentile = repository.signalFfPercentile.first()
+            // Carrega el model de veu actiu → tota la calibració passa pel filtre
+            FilteredAudioSource.setVoice(VoiceRepository(application).activeProfile())
         }
     }
 
@@ -94,7 +97,7 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
                 val startTime = System.currentTimeMillis()
                 val durationMs = (LISTEN_DURATION_SECONDS * 1000).toLong()
 
-                AudioMeter.dbFlow()
+                FilteredAudioSource.filteredDbFlow()
                     .takeWhile { System.currentTimeMillis() - startTime < durationMs }
                     .collect { db ->
                         values.add(db)
@@ -154,7 +157,7 @@ class HearingCalcViewModel(application: Application) : AndroidViewModel(applicat
                 val startTime = System.currentTimeMillis()
                 val durationMs = durationSeconds * 1000L
 
-                AudioMeter.dbFlow()
+                FilteredAudioSource.filteredDbFlow()
                     .takeWhile { System.currentTimeMillis() - startTime < durationMs }
                     .collect { db ->
                         val scale = ScaleConverter.dbToScale(db)

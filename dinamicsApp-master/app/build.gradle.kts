@@ -50,6 +50,11 @@ android {
             applicationIdSuffix = ".v7" // Clau: farà que l'ID sigui com.dynamicsapp.v5
             manifestPlaceholders["appName"] = "Voice_Rec_DinamiqApp" // El nom al mòbil
         }
+        create("v8") {
+            dimension = "versio"
+            applicationIdSuffix = ".v8" // Clau: farà que l'ID sigui com.dynamicsapp.v5
+            manifestPlaceholders["appName"] = "Voice_Rec_DinamiqApp2" // El nom al mòbil
+        }
     }
 
     buildTypes {
