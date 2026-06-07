@@ -11,6 +11,7 @@ import com.example.dinamiqapp.ui.screens.meter.MeterScreen
 import com.example.dinamiqapp.ui.screens.settings.SettingsMenuScreen
 import com.example.dinamiqapp.ui.screens.settings.SettingsScreen
 import com.example.dinamiqapp.ui.screens.welcome.WelcomeScreen
+import com.example.dinamiqapp.ui.voices.VoiceManagementScreen
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
@@ -21,8 +22,9 @@ fun AppNavGraph(navController: NavHostController) {
         composable(Screen.Welcome.route) {
             WelcomeScreen(
                 onNavigateToMeasurement = { navController.navigate(Screen.Measurement.route) },
-                onNavigateToMeter = { navController.navigate(Screen.Meter.route) },
-                onNavigateToSettings = { navController.navigate(Screen.SettingsMenu.route) }
+                onNavigateToMeter       = { navController.navigate(Screen.Meter.route) },
+                onNavigateToSettings    = { navController.navigate(Screen.SettingsMenu.route) },
+                onNavigateToVoices      = { navController.navigate(Screen.VoiceManager.route) }
             )
         }
         composable(Screen.Measurement.route) {
@@ -34,9 +36,10 @@ fun AppNavGraph(navController: NavHostController) {
         composable(Screen.SettingsMenu.route) {
             SettingsMenuScreen(
                 onNavigateToDynamicSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToHearingCalc = { navController.navigate(Screen.HearingCalc.route) },
-                onNavigateToAppSettings = { navController.navigate(Screen.AppSettings.route) },
-                onBack = { navController.popBackStack() }
+                onNavigateToHearingCalc     = { navController.navigate(Screen.HearingCalc.route) },
+                onNavigateToAppSettings     = { navController.navigate(Screen.AppSettings.route) },
+                onNavigateToVoices          = { navController.navigate(Screen.VoiceManager.route) },
+                onBack                      = { navController.popBackStack() }
             )
         }
         composable(Screen.Settings.route) {
@@ -47,6 +50,9 @@ fun AppNavGraph(navController: NavHostController) {
         }
         composable(Screen.AppSettings.route) {
             AppSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Screen.VoiceManager.route) {
+            VoiceManagementScreen(onBack = { navController.popBackStack() })
         }
     }
 }

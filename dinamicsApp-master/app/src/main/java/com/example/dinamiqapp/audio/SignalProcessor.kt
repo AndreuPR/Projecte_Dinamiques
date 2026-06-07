@@ -3,23 +3,18 @@ package com.example.dinamiqapp.audio
 import com.example.dinamiqapp.data.AudioReading
 import com.example.dinamiqapp.data.DynamicLevel
 import com.example.dinamiqapp.data.DynamicRange
+import com.example.dinamiqapp.data.VoiceProfile
 import com.example.dinamiqapp.data.classifyDb
 
-/**
- * Encapsula tot el processament del senyal d'àudio:
- * suavitzat EMA + histèresi de canvi de dinàmica.
- *
- * Quan s'implementi TensorFlow, es crearà una subclasse o implementació
- * alternativa d'aquesta interfície sense tocar res més.
- */
 interface AudioEngine {
-    fun process(db: Float, ranges: Map<DynamicLevel, DynamicRange>): AudioReading
+    fun process(frame: AudioFrame, ranges: Map<DynamicLevel, DynamicRange>): AudioReading
     fun reset()
 }
 
 data class SignalConfig(
-    val emaAlpha: Float = 0.25f,      // 0.05 (molt suau) – 1.0 (sense suavitzat)
-    val hysteresisCount: Int = 3,      // lectures consecutives per confirmar canvi
+    val emaAlpha: Float = 0.25f,
+    val hysteresisCount: Int = 3,
+    val voiceSimilarityThreshold: Float = 0.82f
 )
 
 class SignalProcessor(private var config: SignalConfig = SignalConfig()) : AudioEngine {
@@ -28,6 +23,12 @@ class SignalProcessor(private var config: SignalConfig = SignalConfig()) : Audio
     private var candidateLevel: DynamicLevel? = null
     private var candidateCount: Int = 0
     private var confirmedLevel: DynamicLevel? = null
+
+    // Perfil de veu actiu (null = sense filtre)
+    var activeVoice: VoiceProfile? = null
+
+    // Callback per notificar similitud calculada (útil per al "keep learning")
+    var onSimilarityMeasured: ((mfcc: FloatArray, similarity: Float) -> Unit)? = null
 
     fun updateConfig(newConfig: SignalConfig) {
         config = newConfig
@@ -41,27 +42,44 @@ class SignalProcessor(private var config: SignalConfig = SignalConfig()) : Audio
         confirmedLevel = null
     }
 
-    override fun process(db: Float, ranges: Map<DynamicLevel, DynamicRange>): AudioReading {
-        // EMA: suavitza el senyal brut
-        smoothedDb = if (smoothedDb == null) db
-                     else config.emaAlpha * db + (1f - config.emaAlpha) * smoothedDb!!
+    override fun process(frame: AudioFrame, ranges: Map<DynamicLevel, DynamicRange>): AudioReading {
+        // 1. Filtre de veu (si hi ha perfil actiu)
+        val voiceAccepted = checkVoice(frame.pcm)
+        if (!voiceAccepted) {
+            // El so no coincideix amb la veu activa — retornem l'estat actual sense canviar res
+            return AudioReading(frame.db, confirmedLevel, 0f)
+        }
+
+        // 2. EMA: suavitza el senyal
+        smoothedDb = if (smoothedDb == null) frame.db
+                     else config.emaAlpha * frame.db + (1f - config.emaAlpha) * smoothedDb!!
 
         val sDb = smoothedDb!!
         val reading = classifyDb(sDb, ranges)
 
-        // Histèresi: acumula lectures de la mateixa dinàmica candidata
+        // 3. Histèresi
         if (reading.level == candidateLevel) {
             candidateCount++
         } else {
             candidateLevel = reading.level
             candidateCount = 1
         }
-
-        // Canvia la dinàmica confirmada només quan la candidata es manté prou lectures
         if (candidateCount >= config.hysteresisCount) {
             confirmedLevel = candidateLevel
         }
 
         return reading.copy(level = confirmedLevel)
+    }
+
+    /**
+     * Comprova si el frame PCM coincideix amb la veu activa.
+     * Retorna true si no hi ha perfil actiu (sense filtre).
+     */
+    private fun checkVoice(pcm: ShortArray): Boolean {
+        val voice = activeVoice ?: return true
+        val mfcc  = MfccExtractor.extract(pcm)
+        val sim   = MfccExtractor.cosineSimilarity(mfcc, voice.mfccCentroid)
+        onSimilarityMeasured?.invoke(mfcc, sim)
+        return sim >= config.voiceSimilarityThreshold
     }
 }

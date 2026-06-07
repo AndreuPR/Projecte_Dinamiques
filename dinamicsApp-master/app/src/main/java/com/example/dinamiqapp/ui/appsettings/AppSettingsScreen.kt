@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -22,6 +23,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
     val hysteresis by viewModel.hysteresis.collectAsState()
     val ppPercentile by viewModel.ppPercentile.collectAsState()
     val ffPercentile by viewModel.ffPercentile.collectAsState()
+    val keepLearning by viewModel.keepLearning.collectAsState()
 
     Scaffold(
         topBar = {
@@ -139,6 +141,31 @@ fun AppSettingsScreen(onBack: () -> Unit) {
                 onValueChange = { viewModel.updateFfPercentile(it) },
                 range = 0.60f..0.99f
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Secció: Reconeixement de veu ──────────────────────────
+            SectionTitle("Reconeixement de veu")
+            Text(
+                "Si 'Seguir aprenent' està actiu, l'app millora el model de veu en segon pla " +
+                "mentre mesures. Consumeix una mica més de CPU.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text("Seguir aprenent", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    Text(if (keepLearning) "Actiu — millorant el model" else "Inactiu — estalvi de recursos",
+                         style = MaterialTheme.typography.bodySmall,
+                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = keepLearning, onCheckedChange = { viewModel.updateKeepLearning(it) })
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
