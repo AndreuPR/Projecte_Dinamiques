@@ -27,8 +27,9 @@ fun MeasurementScreen(
 ) {
     val context = LocalContext.current
     val viewModel: MeasurementViewModel = viewModel()
-    val currentLevel by viewModel.currentLevel.collectAsState()
-    val precision by viewModel.precision.collectAsState()
+    val currentLevel  by viewModel.currentLevel.collectAsState()
+    val precision     by viewModel.precision.collectAsState()
+    val keepLearning  by viewModel.keepLearning.collectAsState()
 
     var hasPermission by remember {
         mutableStateOf(
@@ -101,7 +102,27 @@ fun MeasurementScreen(
                     fontWeight = FontWeight.Medium,
                     color = dynamicColors.onBackground.copy(alpha = 0.85f)
                 )
-                Spacer(modifier = Modifier.height(80.dp))
+                Spacer(modifier = Modifier.height(48.dp))
+
+                // Toggle "seguir aprenent" (visible únicament si hi ha veu activa)
+                if (viewModel.hasActiveVoice) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = if (keepLearning) "Aprenent..." else "Seguir aprenent",
+                            color = dynamicColors.onBackground.copy(alpha = 0.75f),
+                            fontSize = 14.sp
+                        )
+                        Switch(
+                            checked = keepLearning,
+                            onCheckedChange = { viewModel.toggleKeepLearning() }
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
                 TextButton(onClick = onBack) {
                     Text("← Tornar", color = dynamicColors.onBackground)
                 }
