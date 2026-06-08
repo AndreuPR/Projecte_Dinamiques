@@ -73,12 +73,13 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "dy
 class SettingsRepository(private val context: Context) {
     val appMinDb: Flow<Float> = context.dataStore.data.map { it[APP_MIN_DB] ?: -70f }
     val appMaxDb: Flow<Float> = context.dataStore.data.map { it[APP_MAX_DB] ?: 0f }
-    val appRefreshMs: Flow<Int> = context.dataStore.data.map { it[APP_REFRESH_MS] ?: 200 }
+    val appRefreshMs: Flow<Int> = context.dataStore.data.map { it[APP_REFRESH_MS] ?: 100 }
     val signalEmaAlpha: Flow<Float> = context.dataStore.data.map { it[SIGNAL_EMA_ALPHA] ?: 0.25f }
     val signalHysteresis: Flow<Int> = context.dataStore.data.map { it[SIGNAL_HYSTERESIS] ?: 3 }
     val signalPpPercentile: Flow<Float> = context.dataStore.data.map { it[SIGNAL_PP_PERCENTILE] ?: 0.15f }
     val signalFfPercentile: Flow<Float>        = context.dataStore.data.map { it[SIGNAL_FF_PERCENTILE] ?: 0.90f }
     val voiceSimilarityThreshold: Flow<Float>  = context.dataStore.data.map { it[VOICE_SIMILARITY] ?: 0.82f }
+    val signalAttackRelease: Flow<Float>       = context.dataStore.data.map { it[SIGNAL_ATTACK_RELEASE] ?: 3.0f }
 
     companion object {
         private val ACTIVE_PROFILE = stringPreferencesKey("active_profile")
@@ -87,9 +88,10 @@ class SettingsRepository(private val context: Context) {
         private val APP_REFRESH_MS = intPreferencesKey("app_refresh_ms")
         private val SIGNAL_EMA_ALPHA = floatPreferencesKey("signal_ema_alpha")
         private val SIGNAL_HYSTERESIS = intPreferencesKey("signal_hysteresis")
-        private val SIGNAL_PP_PERCENTILE = floatPreferencesKey("signal_pp_percentile")
-        private val SIGNAL_FF_PERCENTILE = floatPreferencesKey("signal_ff_percentile")
-        private val VOICE_SIMILARITY     = floatPreferencesKey("voice_similarity_threshold")
+        private val SIGNAL_PP_PERCENTILE    = floatPreferencesKey("signal_pp_percentile")
+        private val SIGNAL_FF_PERCENTILE    = floatPreferencesKey("signal_ff_percentile")
+        private val VOICE_SIMILARITY        = floatPreferencesKey("voice_similarity_threshold")
+        private val SIGNAL_ATTACK_RELEASE   = floatPreferencesKey("signal_attack_release_ratio")
         private fun rangeKey(profile: String, level: DynamicLevel, isMin: Boolean) =
             floatPreferencesKey("${profile}_${level.name}_${if (isMin) "min" else "max"}")
     }
@@ -128,6 +130,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setSignalPpPercentile(value: Float) { context.dataStore.edit { it[SIGNAL_PP_PERCENTILE] = value } }
     suspend fun setSignalFfPercentile(value: Float)       { context.dataStore.edit { it[SIGNAL_FF_PERCENTILE] = value } }
     suspend fun setVoiceSimilarityThreshold(value: Float) { context.dataStore.edit { it[VOICE_SIMILARITY] = value } }
+    suspend fun setSignalAttackRelease(value: Float)      { context.dataStore.edit { it[SIGNAL_ATTACK_RELEASE] = value } }
 
     suspend fun saveRange(profileName: String, level: DynamicLevel, range: DynamicRange) {
         context.dataStore.edit { prefs ->

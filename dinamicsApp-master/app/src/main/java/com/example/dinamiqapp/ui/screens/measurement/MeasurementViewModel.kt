@@ -44,8 +44,9 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
 
             // Configura el motor de senyal
             processor.updateConfig(SignalConfig(
-                emaAlpha        = repository.signalEmaAlpha.first(),
-                hysteresisCount = repository.signalHysteresis.first()
+                emaAlpha           = repository.signalEmaAlpha.first(),
+                hysteresisCount    = repository.signalHysteresis.first(),
+                attackReleaseRatio = repository.signalAttackRelease.first()
             ))
 
             // Carrega el model de veu a FilteredAudioSource (porta d'entrada única)

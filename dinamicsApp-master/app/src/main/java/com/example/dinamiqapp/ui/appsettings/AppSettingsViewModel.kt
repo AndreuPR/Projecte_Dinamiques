@@ -26,6 +26,7 @@ class AppSettingsViewModel(application: Application) : AndroidViewModel(applicat
     private val _ffPercentile  = MutableStateFlow(0.90f)
     private val _keepLearning        = MutableStateFlow(false)
     private val _similarityThreshold = MutableStateFlow(0.82f)
+    private val _attackRelease       = MutableStateFlow(3.0f)
 
     val minDb: StateFlow<Float> = _minDb
     val maxDb: StateFlow<Float> = _maxDb
@@ -36,6 +37,7 @@ class AppSettingsViewModel(application: Application) : AndroidViewModel(applicat
     val ffPercentile: StateFlow<Float>  = _ffPercentile
     val keepLearning: StateFlow<Boolean> = _keepLearning
     val similarityThreshold: StateFlow<Float> = _similarityThreshold
+    val attackRelease: StateFlow<Float> = _attackRelease
 
     init {
         viewModelScope.launch {
@@ -48,6 +50,7 @@ class AppSettingsViewModel(application: Application) : AndroidViewModel(applicat
             repository.signalFfPercentile.first().let { _ffPercentile.value = it }
             voiceRepository.keepLearning.first().let { _keepLearning.value = it }
             repository.voiceSimilarityThreshold.first().let { _similarityThreshold.value = it }
+            repository.signalAttackRelease.first().let { _attackRelease.value = it }
         }
     }
 
@@ -60,6 +63,7 @@ class AppSettingsViewModel(application: Application) : AndroidViewModel(applicat
     fun updateFfPercentile(value: Float) { _ffPercentile.value = value }
     fun updateKeepLearning(value: Boolean) { _keepLearning.value = value }
     fun updateSimilarityThreshold(value: Float) { _similarityThreshold.value = value }
+    fun updateAttackRelease(value: Float) { _attackRelease.value = value }
 
     fun save() {
         viewModelScope.launch {
@@ -80,6 +84,7 @@ class AppSettingsViewModel(application: Application) : AndroidViewModel(applicat
             val sim = _similarityThreshold.value.coerceIn(0.50f, 0.99f)
             repository.setVoiceSimilarityThreshold(sim)
             FilteredAudioSource.similarityThreshold = sim
+            repository.setSignalAttackRelease(_attackRelease.value.coerceIn(1.0f, 8.0f))
         }
     }
 }

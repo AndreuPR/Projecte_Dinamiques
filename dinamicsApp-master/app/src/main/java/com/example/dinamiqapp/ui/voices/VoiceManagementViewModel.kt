@@ -3,6 +3,7 @@ package com.example.dinamiqapp.ui.voices
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.example.dinamiqapp.audio.AudioMeter
 import com.example.dinamiqapp.audio.FilteredAudioSource
 import com.example.dinamiqapp.audio.MfccExtractor
@@ -26,6 +27,7 @@ sealed class TrainState {
 class VoiceManagementViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = VoiceRepository(application)
+    private val TAG = "TrainVM"
 
     // Accés al motor TF (ja inicialitzat a MainActivity)
     val isTfModelAvailable: Boolean get() = FilteredAudioSource.isTfModelAvailable
@@ -42,6 +44,14 @@ class VoiceManagementViewModel(application: Application) : AndroidViewModel(appl
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
 
+    // Nivell de so en temps real durant l'entrenament (dBFS, -90..0)
+    private val _liveDb = MutableStateFlow<Float?>(null)
+    val liveDb: StateFlow<Float?> = _liveDb
+
+    // Nombre de mostres vàlides capturades (per debug visual)
+    private val _capturedSamples = MutableStateFlow(0)
+    val capturedSamples: StateFlow<Int> = _capturedSamples
+
     private var trainJob: Job? = null
 
     @androidx.annotation.RequiresPermission(android.Manifest.permission.RECORD_AUDIO)
@@ -51,10 +61,13 @@ class VoiceManagementViewModel(application: Application) : AndroidViewModel(appl
 
         // Reinicia el buffer TF si cal
         if (engineType == EngineType.TENSORFLOW) FilteredAudioSource.tfEngine?.reset()
+        _liveDb.value = null
+        _capturedSamples.value = 0
 
         trainJob = viewModelScope.launch {
             try {
                 val engineLabel = if (engineType == EngineType.TENSORFLOW) "TF Lite" else ""
+                Log.d(TAG, "Iniciant entrenament. Motor=$engineType durada=${durationSeconds}s")
 
                 // Compte enrere
                 for (s in 3 downTo 1) {
@@ -63,26 +76,52 @@ class VoiceManagementViewModel(application: Application) : AndroidViewModel(appl
                 }
 
                 // Gravació: acumula features (MFCC 13-dim o embeddings YAMNet 1024-dim)
-                val allFeatures = mutableListOf<FloatArray>()
-                val startMs    = System.currentTimeMillis()
-                val durationMs = durationSeconds * 1000L
-                val tfEngine   = FilteredAudioSource.tfEngine
+                val allFeatures  = mutableListOf<FloatArray>()
+                val startMs      = System.currentTimeMillis()
+                val durationMs   = durationSeconds * 1000L
+                val tfEngine     = FilteredAudioSource.tfEngine
+                var totalFrames  = 0
+                var skippedFrames = 0
+
+                Log.d(TAG, "Iniciant captura de frames. durationMs=$durationMs")
 
                 AudioMeter.audioFrameFlow(100L)
                     .takeWhile { System.currentTimeMillis() - startMs < durationMs }
                     .collect { frame ->
+                        totalFrames++
                         val secondsLeft = ((durationMs - (System.currentTimeMillis() - startMs)) / 1000L).toInt() + 1
                         _trainState.value = TrainState.Recording(secondsLeft, engineLabel)
+                        _liveDb.value = frame.db
+
                         val features = when (engineType) {
                             EngineType.TENSORFLOW -> tfEngine?.extract(frame.pcm) ?: MfccVoiceEngine.extract(frame.pcm)
                             EngineType.MFCC       -> MfccVoiceEngine.extract(frame.pcm)
                         }
                         // Ignora frames de l'escalfament del buffer TF (tot zeros)
-                        if (features.any { it != 0f }) allFeatures.add(features)
+                        if (features.any { it != 0f }) {
+                            allFeatures.add(features)
+                            _capturedSamples.value = allFeatures.size
+                        } else {
+                            skippedFrames++
+                        }
+
+                        if (totalFrames <= 3 || totalFrames % 20 == 0) {
+                            Log.d(TAG, "Frame #$totalFrames: dB=${"%.1f".format(frame.db)} features_ok=${allFeatures.size} skipped=$skippedFrames")
+                        }
                     }
 
+                Log.d(TAG, "Captura finalitzada. totalFrames=$totalFrames featuresOk=${allFeatures.size} skipped=$skippedFrames")
+                _liveDb.value = null
+
                 if (allFeatures.size < 5) {
-                    _message.value = "Massa poc àudio. Intenta-ho de nou."
+                    val msg = if (totalFrames == 0)
+                        "El micròfon no ha enviat cap dada. Comprova el permís i torna-ho a provar."
+                    else if (skippedFrames == totalFrames)
+                        "Totes les mostres TF Lite eren zeros (error d'inferència). Mira els logs: adb logcat -s TFVoiceEngine"
+                    else
+                        "Massa poc àudio vàlid (${allFeatures.size} mostres). Toca l'instrument i torna-ho a provar."
+                    Log.w(TAG, "TRAINING FAILED: $msg")
+                    _message.value = msg
                     _trainState.value = TrainState.Idle
                     return@launch
                 }
@@ -92,11 +131,14 @@ class VoiceManagementViewModel(application: Application) : AndroidViewModel(appl
                 val centroid = FloatArray(dim) { i ->
                     allFeatures.sumOf { it[i].toDouble() }.toFloat() / allFeatures.size
                 }
+                Log.d(TAG, "Centroid calculat. dims=$dim mostres=${allFeatures.size}")
                 _trainState.value = TrainState.Done(centroid, engineType)
 
             } catch (e: Exception) {
-                _message.value = "Error durant l'entrenament."
+                Log.e(TAG, "Excepció durant l'entrenament: ${e.message}", e)
+                _message.value = "Error: ${e.message}"
                 _trainState.value = TrainState.Idle
+                _liveDb.value = null
             }
         }
     }
@@ -116,11 +158,17 @@ class VoiceManagementViewModel(application: Application) : AndroidViewModel(appl
             "Registre agut"  to "Toca les notes més agudes"
         )
 
+        _liveDb.value = null
+        _capturedSamples.value = 0
+
         trainJob = viewModelScope.launch {
             try {
                 val centroids = mutableListOf<FloatArray>()
+                Log.d(TAG, "Iniciant entrenament per registres. durationPerPhase=${durationSecondsPerPhase}s")
 
                 for ((phaseName, _) in phases) {
+                    Log.d(TAG, "--- Fase: $phaseName ---")
+
                     // Compte enrere per a cada fase
                     for (s in 3 downTo 1) {
                         _trainState.value = TrainState.Countdown(s, phaseName)
@@ -128,20 +176,30 @@ class VoiceManagementViewModel(application: Application) : AndroidViewModel(appl
                     }
 
                     // Gravació de la fase
-                    val allMfcc = mutableListOf<FloatArray>()
-                    val startMs = System.currentTimeMillis()
+                    val allMfcc    = mutableListOf<FloatArray>()
+                    val startMs    = System.currentTimeMillis()
                     val durationMs = durationSecondsPerPhase * 1000L
+                    _capturedSamples.value = 0
 
                     AudioMeter.audioFrameFlow(100L)
                         .takeWhile { System.currentTimeMillis() - startMs < durationMs }
                         .collect { frame ->
                             val secondsLeft = ((durationMs - (System.currentTimeMillis() - startMs)) / 1000L).toInt() + 1
                             _trainState.value = TrainState.Recording(secondsLeft, phaseName)
-                            allMfcc.add(MfccExtractor.extract(frame.pcm))
+                            _liveDb.value = frame.db
+                            allMfcc.add(MfccVoiceEngine.extract(frame.pcm))
+                            _capturedSamples.value = allMfcc.size
+                            if (allMfcc.size <= 3 || allMfcc.size % 20 == 0) {
+                                Log.d(TAG, "[$phaseName] Frame #${allMfcc.size}: dB=${"%.1f".format(frame.db)}")
+                            }
                         }
 
+                    Log.d(TAG, "[$phaseName] Finalitzat: ${allMfcc.size} frames capturats")
+                    _liveDb.value = null
+
                     if (allMfcc.size < 5) {
-                        _message.value = "Massa poc àudio a '$phaseName'. Intenta-ho de nou."
+                        _message.value = "Massa poc àudio a '$phaseName' (${allMfcc.size} frames). Intenta-ho de nou."
+                        Log.w(TAG, "TRAINING FAILED a fase $phaseName: ${allMfcc.size} frames")
                         _trainState.value = TrainState.Idle
                         return@launch
                     }
@@ -150,13 +208,17 @@ class VoiceManagementViewModel(application: Application) : AndroidViewModel(appl
                         allMfcc.sumOf { it[i].toDouble() }.toFloat() / allMfcc.size
                     }
                     centroids.add(centroid)
+                    Log.d(TAG, "[$phaseName] Centroid calculat. dims=${centroid.size}")
                 }
 
+                Log.d(TAG, "Entrenament per registres completat. ${centroids.size} centroids.")
                 _trainState.value = TrainState.MultiDone(centroids)
 
             } catch (e: Exception) {
-                _message.value = "Error durant l'entrenament."
+                Log.e(TAG, "Excepció durant l'entrenament per registres: ${e.message}", e)
+                _message.value = "Error: ${e.message}"
                 _trainState.value = TrainState.Idle
+                _liveDb.value = null
             }
         }
     }

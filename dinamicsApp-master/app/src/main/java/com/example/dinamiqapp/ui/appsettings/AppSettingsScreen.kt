@@ -25,6 +25,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
     val ffPercentile by viewModel.ffPercentile.collectAsState()
     val keepLearning by viewModel.keepLearning.collectAsState()
     val similarityThreshold by viewModel.similarityThreshold.collectAsState()
+    val attackRelease by viewModel.attackRelease.collectAsState()
 
     Scaffold(
         topBar = {
@@ -112,6 +113,20 @@ fun AppSettingsScreen(onBack: () -> Unit) {
                 onValueChange = { viewModel.updateHysteresis(it.toInt()) },
                 range = 1f..10f,
                 steps = 8
+            )
+
+            ParamSlider(
+                label = "Atac / Alliberament",
+                value = attackRelease,
+                valueText = "×${"%.1f".format(attackRelease)}" +
+                    when {
+                        attackRelease < 1.5f -> " — simètric (lent)"
+                        attackRelease < 2.5f -> " — lleuger"
+                        attackRelease < 4.5f -> " — natural (recomanat)"
+                        else                 -> " — molt ràpid en atac"
+                    },
+                onValueChange = { viewModel.updateAttackRelease(it) },
+                range = 1.0f..8.0f
             )
 
             Spacer(modifier = Modifier.height(24.dp))

@@ -21,7 +21,15 @@ interface AudioEngine {
 
 data class SignalConfig(
     val emaAlpha: Float = 0.25f,
-    val hysteresisCount: Int = 3
+    val hysteresisCount: Int = 3,
+    /**
+     * Ràtio atac/alliberament asimètric.
+     * > 1.0 = l'atac (pujada) és més ràpid que l'alliberament (baixada).
+     * Exemple: 3.0 → quan el so puja, l'alpha efectiu és emaAlpha × 3 (fins a 1.0).
+     * Comportament natural de VU meter: reacciona ràpid als crescendos,
+     * baixa suaument en els diminuendos i silencis breus.
+     */
+    val attackReleaseRatio: Float = 3.0f
 )
 
 class SignalProcessor(private var config: SignalConfig = SignalConfig()) : AudioEngine {
@@ -49,9 +57,16 @@ class SignalProcessor(private var config: SignalConfig = SignalConfig()) : Audio
     }
 
     override fun process(frame: AudioFrame, ranges: Map<DynamicLevel, DynamicRange>): AudioReading {
-        // 1. EMA: suavitza el senyal
-        smoothedDb = if (smoothedDb == null) frame.db
-                     else config.emaAlpha * frame.db + (1f - config.emaAlpha) * smoothedDb!!
+        // 1. EMA asimètrica: atac ràpid, alliberament lent
+        //    Quan el so puja (crescendo) reaccionem de pressa.
+        //    Quan baixa (diminuendo o silenci breu) baixem suaument.
+        val prev = smoothedDb
+        val alpha = if (prev == null || frame.db > prev) {
+            (config.emaAlpha * config.attackReleaseRatio).coerceAtMost(1.0f)  // atac
+        } else {
+            config.emaAlpha                                                     // alliberament
+        }
+        smoothedDb = if (prev == null) frame.db else alpha * frame.db + (1f - alpha) * prev
         val sDb = smoothedDb!!
         lastSmoothedDb = sDb
 

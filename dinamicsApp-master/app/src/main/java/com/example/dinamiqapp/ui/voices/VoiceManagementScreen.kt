@@ -31,11 +31,13 @@ import com.example.dinamiqapp.data.VoiceProfile
 fun VoiceManagementScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val vm: VoiceManagementViewModel = viewModel()
-    val profiles       by vm.profiles.collectAsState()
-    val activeId       by vm.activeVoiceId.collectAsState()
-    val trainState     by vm.trainState.collectAsState()
-    val message        by vm.message.collectAsState()
-    val isTfAvailable  = vm.isTfModelAvailable
+    val profiles         by vm.profiles.collectAsState()
+    val activeId         by vm.activeVoiceId.collectAsState()
+    val trainState       by vm.trainState.collectAsState()
+    val message          by vm.message.collectAsState()
+    val liveDb           by vm.liveDb.collectAsState()
+    val capturedSamples  by vm.capturedSamples.collectAsState()
+    val isTfAvailable    = vm.isTfModelAvailable
 
     var hasPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
@@ -74,6 +76,43 @@ fun VoiceManagementScreen(onBack: () -> Unit) {
                         Text("Enregistrant...", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(16.dp))
                         Text("${ts.secondsLeft}s", color = Color(0xFFFFC107), fontSize = 72.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(16.dp))
+
+                        // Barra de nivell de so en temps real
+                        val db = liveDb ?: -90f
+                        val progress = ((db + 90f) / 90f).coerceIn(0f, 1f)
+                        val barColor = when {
+                            progress > 0.80f -> Color(0xFFF44336)  // vermell: massa fort
+                            progress > 0.40f -> Color(0xFF4CAF50)  // verd: bo
+                            progress > 0.10f -> Color(0xFFFFC107)  // groc: fluix
+                            else             -> Color(0xFF616161)  // gris: silenci
+                        }
+                        Text(
+                            "${"%.0f".format(db)} dBFS",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 11.sp
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(14.dp)
+                                .background(Color.DarkGray, androidx.compose.foundation.shape.RoundedCornerShape(7.dp))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(progress)
+                                    .height(14.dp)
+                                    .background(barColor, androidx.compose.foundation.shape.RoundedCornerShape(7.dp))
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Mostres capturades: $capturedSamples",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 11.sp
+                        )
+
                         Spacer(Modifier.height(16.dp))
                         CircularProgressIndicator(color = Color(0xFFFFC107))
                         Spacer(Modifier.height(24.dp))
